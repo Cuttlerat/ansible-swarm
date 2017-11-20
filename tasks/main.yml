@@ -1,0 +1,24 @@
+---
+- name: Init cluster
+  command: bash -c "docker swarm init --advertise-addr={{ ansible_default_ipv4.address }} | grep -C1 -- '--token'"
+  register: docker_token
+  when: inventory_hostname in groups['swarm_managers']
+
+- debug: msg="{{ docker_token.stdout }}"
+  when: inventory_hostname in groups['swarm_managers']
+
+- name: Join workers
+  command: bash -c "{{ hostvars[item].docker_token.stdout }}"
+  when:
+    - inventory_hostname in groups['swarm_workers']
+    - hostvars[item].docker_token is defined
+    - hostvars[item].docker_token.stdout is defined
+  with_items: "{{ groups['swarm_managers'] }}"
+
+- name: Check nodes
+  command: bash -c "docker node ls"
+  register: docker_nodes
+  when: inventory_hostname in groups['swarm_managers']
+
+- debug: msg="{{ docker_nodes.stdout }}"
+  when: inventory_hostname in groups['swarm_managers']
