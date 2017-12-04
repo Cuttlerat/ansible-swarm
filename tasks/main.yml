@@ -1,4 +1,6 @@
 ---
+- setup:
+    
 - name: Init cluster
   command: bash -c "docker swarm init --advertise-addr={{ ansible_default_ipv4.address }} | grep -C1 -- '--token'"
   register: docker_token
