@@ -20,7 +20,9 @@
 
 - name: Join managers
   command: bash -c "docker swarm join --token {{ hostvars['swarm_prime_manager'].docker_manager_token.stdout }} {{ hostvars['swarm_prime_manager'].ansible_default_ipv4.address }}:2377"
+  ignore_errors: yes
   when:
+    - groups["swarm_manager"] is defined
     - inventory_hostname in groups["swarm_manager"]
     - inventory_hostname != 'swarm_prime_manager'
     - hostvars['swarm_prime_manager'].docker_manager_token is defined
@@ -28,7 +30,9 @@
 
 - name: Join workers
   command: bash -c "docker swarm join --token {{ hostvars['swarm_prime_manager'].docker_worker_token.stdout }} {{ hostvars['swarm_prime_manager'].ansible_default_ipv4.address }}:2377"
+  ignore_errors: yes
   when:
+    - groups["swarm_worker"] is defined
     - inventory_hostname in groups["swarm_worker"]
     - hostvars['swarm_prime_manager'].docker_worker_token is defined
     - hostvars['swarm_prime_manager'].docker_worker_token.stdout is defined
