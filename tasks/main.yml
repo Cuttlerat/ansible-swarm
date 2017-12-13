@@ -1,26 +1,50 @@
 ---
 - setup:
-    
-- name: Init cluster
-  command: bash -c "docker swarm init --advertise-addr={{ ansible_default_ipv4.address }} | grep -C1 -- '--token'"
-  register: docker_token
-  when: inventory_hostname in groups['swarm_managers']
 
-- debug: msg="{{ docker_token.stdout }}"
-  when: inventory_hostname in groups['swarm_managers']
+- name: Init cluster
+  command: bash -c "docker swarm init --advertise-addr={{ ansible_default_ipv4.address }}"
+  register: docker_token
+  when:
+    - init_cluster
+    - inventory_hostname == 'swarm_prime_manager'
+
+- name: Get worker token
+  command: bash -c "docker swarm join-token worker -q"
+  register: docker_worker_token
+  when: inventory_hostname == 'swarm_prime_manager'
+
+- name: Get manager token
+  command: bash -c "docker swarm join-token manager -q"
+  register: docker_manager_token
+  when: inventory_hostname == 'swarm_prime_manager'
+
+- name: Join managers
+  command: bash -c "docker swarm join --token {{ hostvars['swarm_prime_manager'].docker_manager_token.stdout }} {{ hostvars['swarm_prime_manager'].ansible_default_ipv4.address }}:2377"
+  when:
+    - inventory_hostname in groups["swarm_manager"]
+    - inventory_hostname != 'swarm_prime_manager'
+    - hostvars['swarm_prime_manager'].docker_manager_token is defined
+    - hostvars['swarm_prime_manager'].docker_manager_token.stdout is defined
 
 - name: Join workers
-  command: bash -c "{{ hostvars[item].docker_token.stdout }}"
+  command: bash -c "docker swarm join --token {{ hostvars['swarm_prime_manager'].docker_worker_token.stdout }} {{ hostvars['swarm_prime_manager'].ansible_default_ipv4.address }}:2377"
   when:
-    - inventory_hostname in groups['swarm_workers']
-    - hostvars[item].docker_token is defined
-    - hostvars[item].docker_token.stdout is defined
-  with_items: "{{ groups['swarm_managers'] }}"
+    - inventory_hostname in groups["swarm_worker"]
+    - hostvars['swarm_prime_manager'].docker_worker_token is defined
+    - hostvars['swarm_prime_manager'].docker_worker_token.stdout is defined
 
 - name: Check nodes
   command: bash -c "docker node ls"
   register: docker_nodes
-  when: inventory_hostname in groups['swarm_managers']
+  when: inventory_hostname == 'swarm_prime_manager'
+
+- name: Add labels
+  command: "docker node update --label-add {{ item }}=true {{ ansible_hostname }}"
+  delegate_to: swarm_prime_manager
+  when:
+    - roles is defined
+  with_items:
+    - "{{ roles }}"
 
 - debug: msg="{{ docker_nodes.stdout }}"
-  when: inventory_hostname in groups['swarm_managers']
+  when: inventory_hostname == 'swarm_prime_manager'
